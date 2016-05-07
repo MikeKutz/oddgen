@@ -17,8 +17,20 @@ CREATE OR REPLACE PACKAGE BODY teplsql2_view IS
 
 -- use <%='/'%> instead of plain slash (/) to ensure that IDEs such as PL/SQL Developer do not interpret it as command terminator
 -- conditional compilation statements must be defined in lower case
--- grant select_catalog_role to package teplsql.teplsql required (12c feature)
 $if false $then
+<%@ template name=where_clause %>
+<% FOR l_rec IN c_pk_columns LOOP %>
+<% IF l_rec.is_first = 1 THEN %>
+       WHERE <%= l_rec.column_name %> = :OLD.<%= l_rec.column_name %>
+<% ELSE %>
+<%= chr(10) %>
+         AND <%= l_rec.column_name %> = :OLD.<%= l_rec.column_name %>
+<% END IF; %>
+<% END LOOP; %>
+<%= ';' %>
+$end
+$if false $then
+<%@ template name=generate %>
 <%!
 CURSOR c_columns IS
    SELECT column_name,
@@ -69,22 +81,6 @@ BEGIN
       teplsql.p(',');
    END IF;
 END add_comma_if;
---
-PROCEDURE print_where_clause IS
-BEGIN
-   FOR l_rec IN c_pk_columns
-   LOOP
-      IF l_rec.is_first = 1 THEN
-         teplsql.p('       WHERE ');
-      ELSE
-         teplsql.p(chr(10));
-         teplsql.p('         AND ');
-      END IF;
-      teplsql.p(l_rec.column_name);
-      teplsql.p(' = :OLD.');
-      teplsql.p(l_rec.column_name);
-   END LOOP;
-END print_where_clause;
 %>
 -- create 1:1 view for demonstration purposes
 CREATE OR REPLACE VIEW ${view_name} AS
@@ -120,10 +116,10 @@ BEGIN
              <%= l_rec.column_name %> = :NEW.<%= l_rec.column_name %><% add_comma_if(l_rec.is_last = 0); %>\\n
 <% END IF; %>
 <% END LOOP; %>
-<% print_where_clause; %>;
+<%@ include(where_clause, TEPLSQL2_VIEW, PACKAGE_BODY, ${schema_name}) %>
    ELSIF DELETING THEN
       DELETE FROM ${object_name}
-<% print_where_clause; %>;
+<%@ include(where_clause, TEPLSQL2_VIEW, PACKAGE_BODY, ${schema_name}) %>
    END IF;
 END;
 <%='/'%>\\n
@@ -131,7 +127,15 @@ END;
 $end
 
    --
-   -- private constants
+   -- parameter names used also as labels in the GUI
+   --
+   co_view_suffix  CONSTANT param_type := 'View suffix';
+   co_table_suffix CONSTANT param_type := 'Table suffix to be replaced';
+   co_iot_suffix   CONSTANT param_type := 'Instead-of-trigger suffix';
+   co_gen_iot      CONSTANT param_type := 'Generate instead-of-trigger?';
+
+   --
+   -- other constants
    --
    co_max_obj_len  CONSTANT pls_integer := 30;
    co_oddgen_error CONSTANT pls_integer := -20501;
@@ -325,7 +329,7 @@ $end
          l_vars('view_name') := get_view_name;
          l_vars('iot_name') := get_iot_name;
          l_vars('gen_iot') := l_params(co_gen_iot);
-         l_vars('schema_name') := SYS_CONTEXT ('USERENV', 'CURRENT_USER');
+         l_vars('schema_name') := $$PLSQL_UNIT_OWNER;
          l_result := teplsql.process(p_vars          => l_vars,
                                      p_template_name => 'generate',
                                      p_object_name   => $$PLSQL_UNIT,
