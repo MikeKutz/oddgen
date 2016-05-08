@@ -142,7 +142,7 @@ This function is useful for tePLSQL generator.
 </p>
 <p><h2>uses case</h2>
 for curr in dd.getSOMETHING loop<br>
-&nbsp;@nbsp;add_comma( curr.is_last_record )<br>
+<%= '&' %>nbsp;<%= '&' %>nbsp;add_comma( curr.is_last_record )<br>
 end loop;
 </p>
 
@@ -310,7 +310,7 @@ as
   <%@ include( /dd/dd/cursors#main, TEPLSQL_DD_GENERATOR ) %>
 
 end;
-/
+<%= '/' %>
 
 $end
 
